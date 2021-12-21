@@ -6,23 +6,15 @@ export interface ISquareProps {
     occupiedPiece?: ChessPiece;
     rowNumber: number;
     columnName: string;
+    clickHandler: (occupiedPiece: ChessPiece) => void;
 }
 
 // This is a stateless component because it just displays what it is sent in via props
 export function Square(props: ISquareProps): JSX.Element {
 
 
-    function handleClick() {
-        if (props.occupiedPiece) {
-            // let the user do something...
-        }
-        else {
-            alert("You don't have a piece on this square, so don't click here you scrub");
-        }
-    }
-
     return <>
-        <div className={`_square ${props.color}`} onClick={() => handleClick()}>
+        <div className={`_square ${props.color}`} onClick={() => props.clickHandler(props.occupiedPiece)}> 
             {props.columnName}
             {props.rowNumber}
             {props.occupiedPiece}
