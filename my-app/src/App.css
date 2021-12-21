@@ -1,0 +1,35 @@
+html, body {
+  padding: 0;
+  margin: 0
+}
+
+#root {
+  width: 100%;
+
+}
+._container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+._chessBoard {
+  display: flex;
+  min-width: 400px;
+  max-width: 80%;
+  flex-wrap: wrap;
+}
+
+._square {
+  height: 80px;
+  width: 80px;
+  border: 1px solid black;
+}
+
+.dark {
+  background-color: black;
+}
+
+.light {
+  background-color: white;
+}
