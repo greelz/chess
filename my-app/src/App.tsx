@@ -1,14 +1,16 @@
 import React from "react";
 import logo from "./logo.svg";
 import "./App.css";
-import Square from "./Square";
-import { ChessPiece } from "./Enums";
+import Board from "./Board";
 
 function App() {
+
+
+
   return (
     <div className="_container">
       <div className="_chessBoard">
-        <Square color="light" columnName="A" rowNumber={8} occupiedPiece={ChessPiece.Rook} />
+        <Board />
       </div>
     </div>
   );
