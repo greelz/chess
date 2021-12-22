@@ -1,8 +1,21 @@
 import { Square, ISquareProps } from "./Square";
 import { ChessPiece, ChessSVG, IChessPiece } from "./Enums";
+import { useState } from "react";
+import { truncateSync } from "fs";
+import { parse } from "path/posix";
+import { isNumericLiteral } from "typescript";
 
 export interface IBoardProps {
   fenNotation: string;
+}
+
+interface IFenTranslation {
+  squares: ISquareProps[][];
+  activeColor: "white" | "black";
+  castlingRights: string;
+  enPassantTarget: string;
+  halfmoveClock: number;
+  fullmoveNumber: number;
 }
 
 export default function Board(props: IBoardProps): JSX.Element {
@@ -11,40 +24,76 @@ export default function Board(props: IBoardProps): JSX.Element {
     let piece: IChessPiece | undefined = undefined;
     switch (elem) {
       case "r":
-        piece = { color: "black", piece: { name: ChessPiece.Rook, iconSvg: ChessSVG.Rook }};
+        piece = {
+          color: "black",
+          piece: { name: ChessPiece.Rook, iconSvg: ChessSVG.Rook },
+        };
         break;
       case "n":
-        piece = { color: "black", piece: { name: ChessPiece.Knight, iconSvg: ChessSVG.Knight }};
+        piece = {
+          color: "black",
+          piece: { name: ChessPiece.Knight, iconSvg: ChessSVG.Knight },
+        };
         break;
       case "b":
-        piece = { color: "black", piece: { name: ChessPiece.Bishop, iconSvg: ChessSVG.Bishop }};
+        piece = {
+          color: "black",
+          piece: { name: ChessPiece.Bishop, iconSvg: ChessSVG.Bishop },
+        };
         break;
       case "k":
-        piece = { color: "black", piece: { name: ChessPiece.King, iconSvg: ChessSVG.King }};
+        piece = {
+          color: "black",
+          piece: { name: ChessPiece.King, iconSvg: ChessSVG.King },
+        };
         break;
       case "q":
-        piece = { color: "black", piece: { name: ChessPiece.Queen, iconSvg: ChessSVG.Queen }};
+        piece = {
+          color: "black",
+          piece: { name: ChessPiece.Queen, iconSvg: ChessSVG.Queen },
+        };
         break;
       case "p":
-        piece = { color: "black", piece: { name: ChessPiece.Pawn, iconSvg: ChessSVG.Pawn }};
+        piece = {
+          color: "black",
+          piece: { name: ChessPiece.Pawn, iconSvg: ChessSVG.Pawn },
+        };
         break;
       case "R":
-        piece = { color: "white", piece: { name: ChessPiece.Rook, iconSvg: ChessSVG.Rook }};
+        piece = {
+          color: "white",
+          piece: { name: ChessPiece.Rook, iconSvg: ChessSVG.Rook },
+        };
         break;
       case "N":
-        piece = { color: "white", piece: { name: ChessPiece.Knight, iconSvg: ChessSVG.Knight }};
+        piece = {
+          color: "white",
+          piece: { name: ChessPiece.Knight, iconSvg: ChessSVG.Knight },
+        };
         break;
       case "B":
-        piece = { color: "white", piece: { name: ChessPiece.Bishop, iconSvg: ChessSVG.Bishop }};
+        piece = {
+          color: "white",
+          piece: { name: ChessPiece.Bishop, iconSvg: ChessSVG.Bishop },
+        };
         break;
       case "K":
-        piece = { color: "white", piece: { name: ChessPiece.King, iconSvg: ChessSVG.King }};
+        piece = {
+          color: "white",
+          piece: { name: ChessPiece.King, iconSvg: ChessSVG.King },
+        };
         break;
       case "Q":
-        piece = { color: "white", piece: { name: ChessPiece.Queen, iconSvg: ChessSVG.Queen }};
+        piece = {
+          color: "white",
+          piece: { name: ChessPiece.Queen, iconSvg: ChessSVG.Queen },
+        };
         break;
       case "P":
-        piece = { color: "white", piece: { name: ChessPiece.Pawn, iconSvg: ChessSVG.Pawn }};
+        piece = {
+          color: "white",
+          piece: { name: ChessPiece.Pawn, iconSvg: ChessSVG.Pawn },
+        };
         break;
       default:
         break;
@@ -89,15 +138,18 @@ export default function Board(props: IBoardProps): JSX.Element {
     };
   }
 
-  function translateFenToSquaresArray(f: string) {
+  function translateFenToSquaresArray(f: string): IFenTranslation | undefined {
+    f = f.trim();
     let ret: ISquareProps[][] = [];
     for (let i = 0; i < 8; ++i) {
       ret[i] = new Array(8);
     }
     let row = 0,
-      column = 0;
-    for (let i = 0; i < f.length; ++i) {
+      column = 0,
+      i = 0;
+    for (i = 0; i < f.length; ++i) {
       let char = f[i];
+      if (char === " ") break;
       let piece = getPieceFromFenChar(char);
       if (!piece) {
         // it's either '/' or a number
@@ -114,31 +166,109 @@ export default function Board(props: IBoardProps): JSX.Element {
         column = (column + 1) % 8;
       }
     }
-    return ret;
+
+    const remain = f.substring(i + 1).split(" ");
+    // remain[0] is whoever's turn it is
+    // remain[1] is castle-rights
+    // remain[2] is en passant target square, or '-'
+    // remain[3] is half-move clock
+    // remain[4] is full move number
+
+    if (!remain || remain.length !== 5) {
+      console.log(
+        "Invalid FEN notation sent over, couldn't find extra information."
+      );
+      return;
+    } else {
+      const [
+        turn,
+        castleRights,
+        enPassantTarget,
+        halfMoveClock,
+        fullMoveNumber,
+      ] = remain;
+
+      console.log(ret, turn, castleRights);
+      if (!isNaN(+halfMoveClock) && !isNaN(+fullMoveNumber)) {
+        let halfMoveClockNum = parseInt(halfMoveClock);
+        let fullMoveNumberNum = parseInt(halfMoveClock);
+        return {
+          squares: ret,
+          activeColor: turn === "w" ? "white" : "black",
+          castlingRights: castleRights,
+          enPassantTarget: enPassantTarget,
+          halfmoveClock: halfMoveClockNum,
+          fullmoveNumber: fullMoveNumberNum,
+        };
+      } else {
+        return;
+      }
+    }
   }
 
-  const squares = translateFenToSquaresArray(props.fenNotation);
-  console.log(squares);
+  const res = translateFenToSquaresArray(props.fenNotation);
+  console.log(res);
 
-  let disp: (JSX.Element[])[] = [];
+  if (!res) {
+    return <>Nothing to display, something went wrong.</>;
+  }
+  const {
+    squares,
+    activeColor,
+    castlingRights,
+    enPassantTarget,
+    halfmoveClock,
+    fullmoveNumber,
+  } = res;
+
+  let disp: JSX.Element[][] = [];
   let rowNum = 0;
-  squares.forEach((row) => {
-    disp.push([]);
-    row.forEach((square) => {
-      disp[rowNum].push(
-        <Square
-          columnName={square.columnName}
-          rowNumber={square.rowNumber}
-          color={square.color}
-          key={square.columnName + square.rowNumber}
-          occupiedPiece={square.occupiedPiece}
-        />
-      );
+  if (squares) {
+    squares.forEach((row) => {
+      disp.push([]);
+      row.forEach((square) => {
+        disp[rowNum].push(
+          <Square
+            columnName={square.columnName}
+            rowNumber={square.rowNumber}
+            color={square.color}
+            key={square.columnName + square.rowNumber}
+            occupiedPiece={square.occupiedPiece}
+          />
+        );
+      });
+      rowNum += 1;
     });
-    rowNum += 1;
-  });
+  }
 
-  return <div className="_chessBoard">{disp.map(row => {
-    return <div className="_boardRow">{row}</div>;
-  })}</div>;
+  return (
+    <>
+      <div className="_chessBoard">
+        {disp.map((row, i) => {
+          return (
+            <div key={"row" + i} className="_boardRow">
+              {row}
+            </div>
+          );
+        })}
+      </div>
+      <div className="_infoBox">
+        <p>
+          It's {activeColor}'s turn.
+        </p>
+        <p>
+          Castling rights are {castlingRights}.
+        </p>
+        <p>
+          En passant target: {enPassantTarget}.
+        </p>
+        <p>
+          Halfmove clock: {halfmoveClock}
+        </p>
+        <p>
+          Fullmove number: {fullmoveNumber}
+        </p>
+      </div>
+    </>
+  );
 }

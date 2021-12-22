@@ -9,19 +9,18 @@ body {
 }
 ._container {
   display: flex;
-  justify-content: center;
-  align-items: center;
+  flex-wrap: wrap;
 }
 
 ._chessBoard {
-  display: block;
-  min-width: 400px;
-  max-width: 80%;
-  flex-wrap: nowrap;
+  display: flex;
+  flex-wrap: wrap;
 }
 
 ._boardRow {
   display: flex;
+  flex-basis: 100%;
+  justify-content: center;
 }
 
 ._square {
@@ -62,4 +61,9 @@ body {
 .light {
   background-color: white;
   color: green;
+}
+
+._infoBox {
+  text-align: center;
+  margin: 0 auto;
 }
