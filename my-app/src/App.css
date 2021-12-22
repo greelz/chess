@@ -1,11 +1,11 @@
-html, body {
+html,
+body {
   padding: 0;
-  margin: 0
+  margin: 0;
 }
 
 #root {
   width: 100%;
-
 }
 ._container {
   display: flex;
@@ -14,23 +14,52 @@ html, body {
 }
 
 ._chessBoard {
-  display: flex;
+  display: block;
   min-width: 400px;
   max-width: 80%;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+}
+
+._boardRow {
+  display: flex;
 }
 
 ._square {
-  height: 80px;
   width: 80px;
-  border: 1px solid black;
+  height: 80px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 2px;
+  box-shadow: 0 0 2px black;
+  position: relative;
+}
+
+._square svg {
+  height: 65px;
+  width: 65px;
+  stroke-width: 10px;
+  filter: drop-shadow(0px 0px 3px rgb(0 0 0 / 0.4));
+}
+
+._square ._rowNumber {
+  position: absolute;
+  top: 0;
+  left: 3px;
+}
+
+._square ._columnName {
+  position: absolute;
+  bottom: 0;
+  right: 5px;
 }
 
 .dark {
-  background-color: black;
+  background-color: green;
   color: white;
 }
 
 .light {
   background-color: white;
+  color: green;
 }

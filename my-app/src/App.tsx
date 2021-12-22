@@ -6,14 +6,7 @@ import Board from "./Board";
 function App() {
   return (
     <div className="_container">
-      <div className="_chessBoard">
-        <Board fenNotation="rrrrrrr" />
-        <Board fenNotation="rQrrrrr" />
-        <Board fenNotation="rnnnnrr" />
-        <Board fenNotation="pppprrr" />
-        <Board fenNotation="rrr   rrrr" />
-        <Board fenNotation="r i  sdf isaf jaslf aewsi fjasjelfasd flksadjf alksrrrrrr" />
-      </div>
+      <Board fenNotation="8/5k2/3p4/1p1Pp2p/pP2Pp1P/P4P1K/8/8" />
     </div>
   );
 }
