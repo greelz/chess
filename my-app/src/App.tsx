@@ -1,13 +1,15 @@
-import React from "react";
+import React, { useRef } from "react";
 import logo from "./logo.svg";
 import "./App.css";
-import Board from "./Board";
+import Game from "./Game";
 
 function App() {
   return (
-    <div className="_container">
-      <Board fenNotation="4k2r/6r1/8/8/8/8/3R4/R3K3 w Qk - 0 1" />
-    </div>
+    <>
+      <div className="_container">
+        <Game startingFen="rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2" />
+      </div>
+    </>
   );
 }
 

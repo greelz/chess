@@ -151,7 +151,7 @@ export default function Board(props: IBoardProps): JSX.Element {
       let char = f[i];
       if (char === " ") break;
       let piece = getPieceFromFenChar(char);
-      if (!piece) {
+      if (piece === undefined) {
         // it's either '/' or a number
         if (char === "/") {
           row += 1;
@@ -221,53 +221,33 @@ export default function Board(props: IBoardProps): JSX.Element {
     fullmoveNumber,
   } = res;
 
-  let disp: JSX.Element[][] = [];
-  let rowNum = 0;
-  if (squares) {
-    squares.forEach((row) => {
-      disp.push([]);
-      row.forEach((square) => {
-        disp[rowNum].push(
-          <Square
-            columnName={square.columnName}
-            rowNumber={square.rowNumber}
-            color={square.color}
-            key={square.columnName + square.rowNumber}
-            occupiedPiece={square.occupiedPiece}
-          />
-        );
-      });
-      rowNum += 1;
-    });
-  }
-
   return (
     <>
       <div className="_chessBoard">
-        {disp.map((row, i) => {
+        {squares.map((row, i) => {
           return (
             <div key={"row" + i} className="_boardRow">
-              {row}
+              {row.map((square) => {
+                return (
+                  <Square
+                    columnName={square.columnName}
+                    rowNumber={square.rowNumber}
+                    color={square.color}
+                    key={square.columnName + square.rowNumber}
+                    occupiedPiece={square.occupiedPiece}
+                  />
+                );
+              })}
             </div>
           );
         })}
       </div>
       <div className="_infoBox">
-        <p>
-          It's {activeColor}'s turn.
-        </p>
-        <p>
-          Castling rights are {castlingRights}.
-        </p>
-        <p>
-          En passant target: {enPassantTarget}.
-        </p>
-        <p>
-          Halfmove clock: {halfmoveClock}
-        </p>
-        <p>
-          Fullmove number: {fullmoveNumber}
-        </p>
+        <p>It's {activeColor}'s turn.</p>
+        <p>Castling rights are {castlingRights}.</p>
+        <p>En passant target: {enPassantTarget}.</p>
+        <p>Halfmove clock: {halfmoveClock}</p>
+        <p>Fullmove number: {fullmoveNumber}</p>
       </div>
     </>
   );

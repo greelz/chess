@@ -2,7 +2,7 @@ import React from "react";
 import { IChessPiece } from "./Enums";
 
 export interface ISquareProps {
-  color?: "dark" | "light";
+  color: "dark" | "light";
   occupiedPiece?: IChessPiece;
   rowNumber: number;
   columnName: string;

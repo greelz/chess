@@ -15,17 +15,24 @@ body {
 ._chessBoard {
   display: flex;
   flex-wrap: wrap;
+  min-width: 400px;
+  min-height: 400px;
+  max-width: 900px;
+  max-height: 900px;
+  width: 80%;
+  height: 80vw;
 }
 
 ._boardRow {
   display: flex;
-  flex-basis: 100%;
+  width: 100%;
   justify-content: center;
+  height: 12.5%;
 }
 
 ._square {
-  width: 80px;
-  height: 80px;
+  width: 12.5%;
+  height: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
