@@ -60,6 +60,15 @@ body {
   right: 5px;
 }
 
+._square._selected {
+  background-color: lightgreen;
+}
+
+._canBeMovedTo {
+  background-color: pink !important;
+  content: "->";
+}
+
 .dark {
   background-color: green;
   color: white;
