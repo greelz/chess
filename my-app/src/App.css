@@ -13,6 +13,7 @@ body {
 }
 
 ._chessBoard {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   min-width: 400px;
@@ -82,4 +83,23 @@ body {
 ._infoBox {
   text-align: center;
   margin: 0 auto;
+}
+
+._checkmate {
+  position: absolute;
+  margin: 0 auto;
+  width: 50%;
+  min-height: 150px;
+  min-width: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  background: darkblue;
+  color: white;
+  z-index: 1;
+  left: 50%;
+  transform: translate(-50%, 50%);
+  opacity: 1;
+  font-size: 20px;
 }

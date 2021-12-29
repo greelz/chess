@@ -6,8 +6,6 @@ export interface IBoardProps {
 }
 
 export default function Board({ onClick, squares }: IBoardProps): JSX.Element {
-  console.log("renddering");
-
   return (
     <>
       <div className="_chessBoard">

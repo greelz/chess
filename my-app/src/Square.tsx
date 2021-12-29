@@ -1,4 +1,4 @@
-import { IChessPiece } from "./Helpers";
+import { IChessPiece } from "./Interfaces";
 
 export interface ISquareUIProps extends ISquareCoreProps {
   onClick: Function;

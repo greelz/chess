@@ -7,7 +7,7 @@ function App() {
   return (
     <>
       <div className="_container">
-        <Game startingFen="rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2" />
+        <Game startingFen="rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d5 1 2" />
       </div>
     </>
   );
