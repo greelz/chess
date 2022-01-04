@@ -1,88 +1,158 @@
 import Board from "./Board";
-import { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   calculateNewCastleRights,
+  calculatePgn,
   deepCopyFunction,
   doEverything,
   getBoardSpotFromPiece,
   getColumnAndRowFromBoardSpot,
   getRowAndColumnFromPiece,
-  getSelectedSquare,
   translateSquaresToFen,
 } from "./Helpers";
 import { ISquareCoreProps } from "./Square";
 import { ChessPiece, IChessPiece } from "./Interfaces";
+import HistoryNavigator from "./HistoryNavigator";
 
 interface IGameProps {
   startingFen: string;
 }
 
 export default function Game(props: IGameProps): JSX.Element {
-  const doNewMove = (newFen: string) => {
-    setGameHistory((prev) => [...prev, newFen]);
-    const len = gameHistory.length;
-    setCurrentPointInHistory(len);
-  };
+  function doNewMove(newFen: string) {
+    // Todo -- add to PGN list, keep in sync
+    setGamePGN([
+      ...gamePgn,
+      calculatePgn(
+        gameHistory[gameHistory.length - 1],
+        newFen,
+        isWhitesTurn || false
+      ),
+    ]);
+    setGameHistory([...gameHistory, newFen]);
+    setCurrentPointInHistory(gameHistory.length);
+  }
 
-  function deselectSelectedSquare(squares: ISquareCoreProps[][]) {
-    const selectedSquare = getSelectedSquare(squares);
-    if (selectedSquare) {
-      const { row, column, success } = getRowAndColumnFromPiece(selectedSquare);
+  function deselectSelectedSquare() {
+    setSelectedSquare(undefined);
+    setDragging(false);
+    if (dragRef.current) {
+      dragRef.current.style.top = "0px";
+      dragRef.current.style.left = "0px";
+      dragRef.current.innerHTML = "";
+    }
+  }
+
+  function trySelectBoardSpot(boardSpot?: string) {
+    if (boardSpot && boardSpot.length === 2) {
+      const { row, column, success } = getColumnAndRowFromBoardSpot(boardSpot);
       if (success) {
-        squares.map((row) => row.map((val) => (val.canBeMovedTo = false)));
-        squares[row][column].selected = false;
+        if (!trySelectSquare(squares[row][column], isWhitesTurn || false)) {
+          deselectSelectedSquare();
+          return false;
+        }
+        return true;
       }
     }
   }
 
   function trySelectSquare(
-    squares: ISquareCoreProps[][],
     squareClicked: ISquareCoreProps,
     isWhitesTurn: boolean
   ): boolean {
-    if (squareClicked.occupiedPiece) {
+    if (currentPointInHistory !== gameHistory.length - 1) return false;
+    if (squareClicked.occupiedPiece && squareClicked !== selectedSquare) {
       if (
         (isWhitesTurn && squareClicked.occupiedPiece.color === "white") ||
         (!isWhitesTurn && squareClicked.occupiedPiece.color === "black")
       ) {
-        selectSquare(squares, squareClicked);
+        selectSquare(squareClicked);
         return true;
       }
     }
     return false;
   }
 
-  function selectSquare(
-    squares: ISquareCoreProps[][],
-    squareClicked: ISquareCoreProps
-  ) {
+  function selectSquare(squareClicked: ISquareCoreProps) {
     // deselect currently selected square
-    deselectSelectedSquare(squares);
+    deselectSelectedSquare();
+    setSelectedSquare(squareClicked);
+  }
 
-    const { row, column, success } = getRowAndColumnFromPiece(squareClicked);
+  function gatherAdditionalMoveData(squareClicked: ISquareCoreProps) {
+    const nameOfPieceThatIsMoving = selectedSquare!.occupiedPiece?.piece.name;
 
-    if (success) {
-      // Set current square as selected
-      squares[row][column].selected = true;
-
-      // Highlight the possible move targets
-      if (allPossibleMoves) {
-        const possibleMovesTargets = allPossibleMoves.allMoves.get(
-          getBoardSpotFromPiece(squareClicked)
-        );
-        possibleMovesTargets?.forEach((boardSpot) => {
-          let { row, column } = getColumnAndRowFromBoardSpot(boardSpot);
-          squares[row][column].canBeMovedTo = true;
-        });
+    let newEnPassantString = "-";
+    if (nameOfPieceThatIsMoving === ChessPiece.Pawn) {
+      if (squareClicked.columnName === selectedSquare!.columnName) {
+        if (
+          Math.abs(squareClicked.rowNumber - selectedSquare!.rowNumber) === 2
+        ) {
+          newEnPassantString =
+            selectedSquare!.columnName.toLowerCase() +
+            (squareClicked.rowNumber + selectedSquare!.rowNumber) / 2;
+        }
       }
+    }
+
+    const nextTurn = isWhitesTurn ? "b" : "w";
+
+    // Castle rights
+    // They stay the same unless a king or rook moved
+    // KQkq is original castling rights
+    let castleRights = castlingRights;
+    castleRights = calculateNewCastleRights(
+      castlingRights,
+      nameOfPieceThatIsMoving,
+      castleRights,
+      isWhitesTurn || false,
+      selectedSquare!
+    );
+
+    // Moves since last pawn advance or piece capture
+    let newHalfmoveClock = (halfmoveClock || 0) + 1;
+    const isCapture = (
+      square1: ISquareCoreProps,
+      square2: ISquareCoreProps
+    ): boolean => {
+      return (
+        square1.occupiedPiece !== undefined &&
+        square2.occupiedPiece !== undefined
+      );
+    };
+
+    if (
+      nameOfPieceThatIsMoving === ChessPiece.Pawn ||
+      isCapture(selectedSquare!, squareClicked)
+    ) {
+      newHalfmoveClock = 0;
+    }
+
+    // Fullmove number
+    const inc = isWhitesTurn ? 0 : 1;
+    const newFullMoveNumber = (fullmoveNumber || 0) + inc;
+
+    return {
+      nextTurn,
+      castleRights,
+      newEnPassantString,
+      newHalfmoveClock,
+      newFullMoveNumber,
+    };
+  }
+
+  function moveToSquareFromSpot(targetSpot: string, initialSpot: string) {
+    const { row, column, success } = getColumnAndRowFromBoardSpot(targetSpot);
+    if (success) {
+      doFullMove(squares[row][column]);
     }
   }
 
   function moveToSquare(
-    squares: ISquareCoreProps[][],
     targetSquare: ISquareCoreProps,
     movingSquare: ISquareCoreProps
-  ) {
+  ): string | undefined {
+    const squaresCopy: ISquareCoreProps[][] = deepCopyFunction(squares);
     if (!movingSquare.occupiedPiece) return;
     const {
       row: targetRow,
@@ -97,152 +167,139 @@ export default function Game(props: IGameProps): JSX.Element {
 
     const pieceCopy: IChessPiece = deepCopyFunction(movingSquare.occupiedPiece);
 
+    // Deal with special cases
+
     // Help with castling if we're doing it
     if (movingSquare.occupiedPiece.piece.name === ChessPiece.King) {
       if (Math.abs(movingCol - targetCol) === 2) {
         // We need to also move the rook to the square next to the king
-        let rookColumn = 0, castlingLong = true;
+        let rookColumn = 0,
+          castlingLong = true;
         if (targetCol === 6) {
           rookColumn = 7;
           castlingLong = false;
         }
 
         const rookPiece: IChessPiece = deepCopyFunction(
-          squares[movingRow][rookColumn].occupiedPiece
+          squaresCopy[movingRow][rookColumn].occupiedPiece
         );
         const columnToMoveTo = Math.abs(castlingLong ? 3 : 2 - rookColumn);
-        squares[movingRow][columnToMoveTo].occupiedPiece = rookPiece;
-        squares[movingRow][rookColumn].occupiedPiece = undefined;
+        squaresCopy[movingRow][columnToMoveTo].occupiedPiece = rookPiece;
+        squaresCopy[movingRow][rookColumn].occupiedPiece = undefined;
       }
+    }
+
+    // Promote a pawn to a queen if it hits the last row
+    if (
+      movingSquare.occupiedPiece.piece.name === ChessPiece.Pawn &&
+      ((targetRow === 7 && !isWhitesTurn) || (targetRow === 0 && isWhitesTurn))
+    ) {
+      pieceCopy.piece.name = ChessPiece.Queen;
+    }
+
+    // Remove the pawn captured via en passant if that's what we did
+    if (
+      movingSquare.occupiedPiece.piece.name === ChessPiece.Pawn &&
+      getBoardSpotFromPiece(targetSquare).toLowerCase() ===
+        enPassantTarget?.toLowerCase()
+    ) {
+      squaresCopy[movingRow][targetCol].occupiedPiece = undefined;
     }
 
     if (success && success2) {
-      squares.map((row) => row.map((val) => (val.canBeMovedTo = false)));
-      squares[targetRow][targetCol].occupiedPiece = pieceCopy;
-      squares[targetRow][targetCol].selected = false;
-        squares[movingRow][movingCol].occupiedPiece = undefined;
-        squares[movingRow][movingCol].selected = false;
+      squaresCopy[targetRow][targetCol].occupiedPiece = pieceCopy;
+      squaresCopy[movingRow][movingCol].occupiedPiece = undefined;
+      deselectSelectedSquare();
+      return translateSquaresToFen(squaresCopy);
     }
   }
 
-  function clickHandler(boardSpot: string) {
-    if (isCheckmate) return;
-    if (boardSpot.length !== 2) {
-      console.error(`Board spot should be two characters: ${boardSpot}`);
-      return;
-    }
+  function doFullMove(squareClicked: ISquareCoreProps) {
+    if (!selectedSquare) return;
+    const newFenInit = moveToSquare(squareClicked, selectedSquare);
+    if (!newFenInit) return;
 
-    let { row, column } = getColumnAndRowFromBoardSpot(boardSpot) || {};
-    if (row === undefined || column === undefined) {
-      console.error("Couldn't determine board location.");
-      return;
-    }
+    var {
+      nextTurn,
+      castleRights,
+      newEnPassantString,
+      newHalfmoveClock,
+      newFullMoveNumber,
+    } = gatherAdditionalMoveData(squareClicked);
 
-    const currentSquaresForUI: ISquareCoreProps[][] = deepCopyFunction(squares);
-    const squareClicked = currentSquaresForUI[row][column];
-    const selectedSquare = getSelectedSquare(currentSquaresForUI);
-    const squareClickedPiece = squareClicked.occupiedPiece;
+    let newFen = `${newFenInit} ${nextTurn} ${castleRights} ${newEnPassantString} ${newHalfmoveClock} ${newFullMoveNumber}`;
+    doNewMove(newFen);
+  }
 
-    // Check if we have a selected square first
-    if (selectedSquare && allPossibleMoves) {
-      const movesThatCanBeMade = allPossibleMoves.allMoves.get(
-        getBoardSpotFromPiece(selectedSquare)
-      );
-      if (
-        // If we are clicking on the same square, deselect it and be done
-        selectedSquare.rowNumber === squareClicked.rowNumber &&
-        selectedSquare.columnName === squareClicked.columnName
-      ) {
-        deselectSelectedSquare(currentSquaresForUI);
-        setSquares(currentSquaresForUI);
+  function dragHandler(e: React.DragEvent<HTMLDivElement>, boardSpot?: string) {
+    if (!boardSpot) return;
+    if (e.type === "mousedown") {
+      e.preventDefault();
+      if (e.button !== 0) {
+        deselectSelectedSquare();
         return;
-      } else if (movesThatCanBeMade?.includes(boardSpot)) {
-        // Before doing the move, need to know what's actually happening
-
-        // Determine enPassant
-        const nameOfPieceThatIsMoving =
-          selectedSquare.occupiedPiece?.piece.name;
-
-        let newEnPassantString = "-";
-        if (nameOfPieceThatIsMoving === ChessPiece.Pawn) {
-          if (squareClicked.columnName === selectedSquare.columnName) {
-            if (
-              Math.abs(squareClicked.rowNumber - selectedSquare.rowNumber) === 2
-            ) {
-              newEnPassantString =
-                selectedSquare.columnName.toLowerCase() +
-                (squareClicked.rowNumber + selectedSquare.rowNumber) / 2;
-            }
+      }
+      if (selectedBoardSpot && allPossibleCurrentMoves?.includes(boardSpot)) {
+        moveToSquareFromSpot(boardSpot, selectedBoardSpot);
+      } else {
+        if (trySelectBoardSpot(boardSpot)) {
+          const targetElem = e.currentTarget.getElementsByTagName("div")[0];
+          const newNode = targetElem.cloneNode(true);
+          if (dragRef.current && newNode) {
+            setDragLocation(dragRef.current, e);
+            dragRef.current.appendChild(newNode);
+            dragRef.current.style.height = e.currentTarget.clientHeight + "px";
+            dragRef.current.style.width = e.currentTarget.clientWidth + "px";
           }
+          setDragging(true);
         }
-
-        // Next turn (either b or w)
-        const nextTurn = isWhitesTurn ? "b" : "w";
-
-        // Castle rights
-        // They stay the same unless a king or rook moved
-        // KQkq is original castling rights
-        let castleRights = castlingRights;
-        castleRights = calculateNewCastleRights(castlingRights, nameOfPieceThatIsMoving, castleRights, isWhitesTurn, selectedSquare);
-
-        // Moves since last pawn advance or piece capture
-        let newHalfmoveClock = (halfmoveClock || 0) + 1;
-        const isCapture = (
-          square1: ISquareCoreProps,
-          square2: ISquareCoreProps
-        ): boolean => {
-          return (
-            square1.occupiedPiece !== undefined &&
-            square2.occupiedPiece !== undefined
-          );
-        };
-
-        if (
-          nameOfPieceThatIsMoving === ChessPiece.Pawn ||
-          isCapture(selectedSquare, squareClicked)
-        ) {
-          newHalfmoveClock = 0;
-        }
-
-        // Fullmove number
-        const inc = isWhitesTurn ? 0 : 1;
-        const newFullMoveNumber = fullmoveNumber || 0 + inc;
-
-        // Perform the move to update the UI
-        moveToSquare(currentSquaresForUI, squareClicked, selectedSquare);
-        setSquares(currentSquaresForUI);
-
-        let newFen = `${translateSquaresToFen(
-          currentSquaresForUI
-        )} ${nextTurn} ${castleRights} ${newEnPassantString} ${newHalfmoveClock} ${newFullMoveNumber}`;
-
-        doNewMove(newFen);
-        return;
-      } else if (!squareClickedPiece) {
-        // Can't move to this square, nothing is there, so deselect
-        deselectSelectedSquare(currentSquaresForUI);
-        setSquares(currentSquaresForUI);
-        return;
-      } else if (
-        trySelectSquare(currentSquaresForUI, squareClicked, isWhitesTurn)
-      ) {
-        setSquares(currentSquaresForUI);
       }
-    } else {
-      // We do not have a selected square, select if the right color
-      if (trySelectSquare(currentSquaresForUI, squareClicked, isWhitesTurn)) {
-        setSquares(currentSquaresForUI);
+    } else if (e.type === "mouseup") {
+      e.preventDefault();
+      if (dragRef.current) dragRef.current.innerHTML = "";
+      setDragging(false);
+      if (!selectedBoardSpot) return; // If nothing is selected do nothing
+      if (boardSpot === selectedBoardSpot) return; // Do nothing if we are releasing on the same square
+      if (allPossibleCurrentMoves?.includes(boardSpot)) {
+        // Try to move to the square, otherwise deselect
+        moveToSquareFromSpot(boardSpot, selectedBoardSpot);
+      } else {
+        deselectSelectedSquare();
       }
+    }
+  }
+  function setDragLocation(elem: HTMLDivElement | null, e: any) {
+    if (elem) {
+      const topPos = e.clientY - 40 + "px";
+      const leftPos = e.clientX - 20 + "px";
+      if (elem.style.top !== topPos) elem.style.top = topPos;
+      if (elem.style.left !== leftPos) elem.style.left = leftPos;
+    }
+  }
+
+  function changeCurrentPIH(point: number) {
+    if (point > -1 && point <= gameHistory.length - 1) {
+      setCurrentPointInHistory(point);
     }
   }
 
   // Game management via FEN
   const [currentPointInHistory, setCurrentPointInHistory] = useState<number>(0);
   const [gameHistory, setGameHistory] = useState<string[]>([props.startingFen]);
-  const current = gameHistory[currentPointInHistory];
-  const fenTranslation = useMemo(() => doEverything(current), [current]);
+  const [gamePgn, setGamePGN] = useState<string[]>([]);
+  const [selectedSquare, setSelectedSquare] = useState<ISquareCoreProps>();
+  const [dragging, setDragging] = useState(false);
+
+  const dragRef = useRef<HTMLDivElement>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
+
+  // Calculated properties from state
+
+  const currentFen = gameHistory[currentPointInHistory];
+  const fenTranslation = useMemo(() => doEverything(currentFen), [currentFen]);
   const {
-    activeColor,
+    squares,
+    isWhitesTurn,
     castlingRights,
     enPassantTarget,
     halfmoveClock,
@@ -251,33 +308,72 @@ export default function Game(props: IGameProps): JSX.Element {
     allPossibleMoves,
   } = fenTranslation;
 
-  const isWhitesTurn = activeColor === "white";
-
-  // The actual squares to be displayed on the board, starting with fen translation
-  // This needs to be updated outside of fen because fen doesn't have UI concepts like
-  // selected square, possible moves, check, etc
-  const [squares, setSquares] = useState<ISquareCoreProps[][]>(
-    fenTranslation.squares
-  );
-
+  const selectedBoardSpot = selectedSquare
+    ? getBoardSpotFromPiece(selectedSquare)
+    : undefined;
+  const allPossibleCurrentMoves =
+    allPossibleMoves && selectedBoardSpot
+      ? allPossibleMoves.allMoves.get(selectedBoardSpot)
+      : undefined;
   const isCheckmate = isInCheck && allPossibleMoves?.possibleMoves === 0;
+  const isStalemate = !isInCheck && allPossibleMoves?.possibleMoves === 0;
+
+  useEffect(() => {
+    window.addEventListener("mouseup", (e: MouseEvent) => {
+      if (!boardRef.current) return;
+      const b = boardRef.current;
+      if (
+        e.x < b.clientLeft ||
+        e.y < b.clientTop ||
+        e.x > b.clientWidth ||
+        e.y > b.clientHeight
+      ) {
+        deselectSelectedSquare();
+      }
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      if (dragRef.current && dragRef.current.innerHTML) {
+        setDragLocation(dragRef.current, e);
+      }
+    });
+  }, []);
 
   return (
-    <>
-      { isCheckmate ? <div className="_checkmate">Checkmate! {isWhitesTurn ? "Black" : "White"} wins!</div> : null }
-      <Board squares={squares} onClick={(spot: string) => clickHandler(spot)} />
-      <div className="_infoBox">
-        <p>It's {activeColor}'s turn.</p>
-        <p>Castling rights are {castlingRights}.</p>
-        <p>En passant target: {enPassantTarget}.</p>
-        <p>Halfmove clock: {halfmoveClock}</p>
-        <p>Fullmove number: {fullmoveNumber}</p>
-      </div>
-      <div style={{ display: "block" }}>
-        {gameHistory.map((h, i) => (
-          <p key={`gameHistory${i}`}>{h}</p>
-        ))}
-      </div>
-    </>
+    <div className="_container">
+      <div id="_dragImage" ref={dragRef} />
+      {isCheckmate || isStalemate ? (
+        <div className="_checkmate">
+          {isCheckmate
+            ? `Checkmate! ${isWhitesTurn ? "Black" : "White"} wins!`
+            : "Stalemate!"}
+        </div>
+      ) : null}
+      <Board
+        bRef={boardRef}
+        grabbyCursor={dragging}
+        squares={squares}
+        selectedBoardSpot={selectedBoardSpot}
+        possibleMoves={allPossibleCurrentMoves || []}
+        onDragOver={(e, s) => dragHandler(e, s)}
+        onDragStart={(e, s) => dragHandler(e, s)}
+        onDragEnter={(e, s) => dragHandler(e, s)}
+        onDrop={(e, s) => dragHandler(e, s)}
+        onRightClick={(e) => {
+          e.preventDefault();
+        }}
+      />
+      <HistoryNavigator
+        myName="greelz"
+        opponentName="jordantas21"
+        moveList={gamePgn}
+        currentPosition={currentPointInHistory}
+        goBack={() => changeCurrentPIH(currentPointInHistory - 1)}
+        goForward={() => changeCurrentPIH(currentPointInHistory + 1)}
+        goBackToBeginning={() => changeCurrentPIH(0)}
+        goToEnd={() => changeCurrentPIH(gameHistory.length - 1)}
+        jumpToPosition={(pos: number) => changeCurrentPIH(pos + 1)}
+      />
+    </div>
   );
 }

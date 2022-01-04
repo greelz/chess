@@ -6,9 +6,7 @@ import Game from "./Game";
 function App() {
   return (
     <>
-      <div className="_container">
-        <Game startingFen="rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d5 1 2" />
-      </div>
+      <Game startingFen="rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d5 1 2" />
     </>
   );
 }

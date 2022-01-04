@@ -1,3 +1,5 @@
+import { getByPlaceholderText } from "@testing-library/react";
+import { chdir } from "process";
 import {
   ChessPiece,
   ChessSVG,
@@ -57,7 +59,7 @@ export function doEverything(f: string) {
 
     return {
       squares: squaresOut,
-      activeColor: isWhitesTurn ? "white" : "black",
+      isWhitesTurn: isWhitesTurn,
       castlingRights: castleRights,
       enPassantTarget: enPassantTarget,
       halfmoveClock: halfMoveClockNum,
@@ -66,6 +68,129 @@ export function doEverything(f: string) {
       allPossibleMoves: allPossiblesMoves,
     };
   }
+}
+
+export function calculatePgn(
+  f1: string,
+  f2: string,
+  isWhitesTurn: boolean,
+): string {
+  const s1 = translateFenToSquaresArray(f1);
+  const s2 = translateFenToSquaresArray(f2);
+
+  const arePiecesTheSame = (p1: ISquareCoreProps, p2: ISquareCoreProps) => {
+    if (p1.occupiedPiece && p2.occupiedPiece) {
+      return (
+        p1.occupiedPiece.color === p2.occupiedPiece.color &&
+        p1.occupiedPiece.piece.name === p2.occupiedPiece.piece.name
+      );
+    } else {
+      // comparing for undefined === undefined
+      return p1.occupiedPiece === p2.occupiedPiece;
+    }
+  };
+
+  let piecesDifferences: ISquareCoreProps[][] = [];
+
+  for (let i = 0; i < 8; ++i) {
+    for (let j = 0; j < 8; ++j) {
+      if (!arePiecesTheSame(s1[i][j], s2[i][j])) {
+        piecesDifferences.push([s1[i][j], s2[i][j]]);
+      }
+    }
+  }
+
+  const len = piecesDifferences.length;
+  let retVal = "";
+  if (len === 2) {
+    // Normal move
+    // [
+    //   [s1, s1b] boardSpot1
+    //   [s2, s2b] boardSpot2
+    // ]
+    const [boardSpot1, boardSpot2] = piecesDifferences;
+    const [s1, s1b] = boardSpot1;
+    const [s2, s2b] = boardSpot2;
+
+    if (s1.occupiedPiece && s2.occupiedPiece) {
+      // something was captured, find the empty spot (which indicates that's where the piece moved from)
+      const capturedPiece = s1b.occupiedPiece
+        ? s1.occupiedPiece
+        : s2.occupiedPiece;
+      const squareThatMoved = s1b.occupiedPiece ? s2 : s1;
+      const destinationBoardSpot = s1b.occupiedPiece
+        ? getBoardSpotFromPiece(s1b)
+        : getBoardSpotFromPiece(s2b);
+      retVal = `${getPieceThatMovedLetter(
+        squareThatMoved,
+        true
+      )}x${destinationBoardSpot.toLowerCase()}`;
+    } else {
+      // We either moved s1 to s2, or s2 to s1
+      const destinationSquare = s1.occupiedPiece ? s2b : s1b;
+      retVal = `${getPieceThatMovedLetter(
+        destinationSquare,
+        false
+      )}${getBoardSpotFromPiece(destinationSquare).toLowerCase()}`;
+    }
+  } else if (len === 3) {
+    // en passant capture
+    const [boardSpot1, boardSpot2, boardSpot3] = piecesDifferences;
+    const [s1, s1b] = boardSpot1;
+    const [s2, s2b] = boardSpot2;
+    const [s3, s3b] = boardSpot3;
+
+    // Whichever of s1b, s2b, and s3b has a piece is the destination
+    const destinationSquare = s1b.occupiedPiece ? s1b : (s2b.occupiedPiece ? s2b : s3b);
+    const destinationPieceColor = destinationSquare.occupiedPiece?.color;
+
+    // Originating row is whichever row matches the destination square's piece color
+    const [p1, p2] = [s1.occupiedPiece, s2.occupiedPiece];
+    const originalColumn = ((p1?.color === destinationPieceColor) ? getBoardSpotFromPiece(s1) : (
+      p2?.color === destinationPieceColor ? getBoardSpotFromPiece(s2) : getBoardSpotFromPiece(s3)))[0].toLowerCase();
+
+    retVal = `${originalColumn}x${getBoardSpotFromPiece(destinationSquare).toLowerCase()}`;
+
+
+  } else if (len === 4) {
+    // castling
+    // Just need to determine if the rook moved two or three squares
+    // We castled queen-side if the rook lands on the d file...
+    const p2 = piecesDifferences[1][0]
+    retVal = p2.columnName === "C" ? "O-O-O" : "O-O";
+  }
+
+  const isCheck = isInCheck(s2, !isWhitesTurn);
+  const moves = getAllPossibleMoves(s2, !isWhitesTurn);
+  const isCheckmate = isCheck && moves.possibleMoves === 0;
+
+  return `${retVal}${isCheck ? (isCheckmate ? "#" : "+") : ""}`;
+}
+
+function getPieceThatMovedLetter(piece: ISquareCoreProps, isCapture: boolean) {
+  let pieceThatMovedLetter = "";
+  switch (piece.occupiedPiece?.piece.name) {
+    case ChessPiece.Bishop:
+      pieceThatMovedLetter = "B";
+      break;
+    case ChessPiece.King:
+      pieceThatMovedLetter = "K";
+      break;
+    case ChessPiece.Knight:
+      pieceThatMovedLetter = "N";
+      break;
+    case ChessPiece.Queen:
+      pieceThatMovedLetter = "Q";
+      break;
+    case ChessPiece.Rook:
+      pieceThatMovedLetter = "R";
+      break;
+    case ChessPiece.Pawn:
+      if (isCapture)
+        pieceThatMovedLetter = getBoardSpotFromPiece(piece)[0].toLowerCase();
+      break;
+  }
+  return pieceThatMovedLetter;
 }
 
 export function translateFenToSquaresArray(f: string): ISquareCoreProps[][] {
@@ -157,10 +282,18 @@ export function getKingLocation(
   }
 }
 
-export function calculateNewCastleRights(castlingRights: string | undefined, nameOfPieceThatIsMoving: ChessPiece | undefined, castleRights: string | undefined, isWhitesTurn: boolean, selectedSquare: ISquareCoreProps) {
-  if (castlingRights !== "-" &&
+export function calculateNewCastleRights(
+  castlingRights: string | undefined,
+  nameOfPieceThatIsMoving: ChessPiece | undefined,
+  castleRights: string | undefined,
+  isWhitesTurn: boolean,
+  selectedSquare: ISquareCoreProps
+) {
+  if (
+    castlingRights !== "-" &&
     (nameOfPieceThatIsMoving === ChessPiece.Rook ||
-      nameOfPieceThatIsMoving === ChessPiece.King)) {
+      nameOfPieceThatIsMoving === ChessPiece.King)
+  ) {
     // We only care if there are some castling rights and a king or rook moved
     // let whiteRights = (/K*Q*KQ/.exec(castlingRights || "") || ["-"])[0];
     // let blackRights = (/k*q*kq/.exec(castlingRights || "") || ["-"])[0];
@@ -192,7 +325,6 @@ export function calculateNewCastleRights(castlingRights: string | undefined, nam
   }
   return castleRights;
 }
-
 
 export function isInCheck(
   squares: ISquareCoreProps[][],
@@ -561,7 +693,7 @@ export function getRowAndColumnFromPiece(piece: ISquareCoreProps): IBoardSpot {
   return getColumnAndRowFromBoardSpot(getBoardSpotFromPiece(piece));
 }
 
-export function getBoardSpotFromPiece(piece: ISquareCoreProps) {
+export function getBoardSpotFromPiece(piece: ISquareCoreProps): string {
   return piece.columnName + piece.rowNumber;
 }
 
@@ -626,18 +758,6 @@ export function getColumnAndRowFromBoardSpot(boardSpot: string): IBoardSpot {
 
   const rowSpot = 8 - parseInt(boardSpot[1]);
   return { row: rowSpot, column: colNumber, success: true };
-}
-
-export function getSelectedSquare(
-  squares: ISquareCoreProps[][]
-): ISquareCoreProps | undefined {
-  for (let i = 0; i < 8; ++i) {
-    for (let j = 0; j < 8; ++j) {
-      if (squares[i][j].selected) {
-        return squares[i][j];
-      }
-    }
-  }
 }
 
 export function translateSquaresToFen(squares: ISquareCoreProps[][]): string {
