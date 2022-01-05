@@ -133,15 +133,17 @@ div svg {
 ._historyNavigator {
   margin: 10px;
   width: 300px;
-  height: 250px;
+  /* height: 250px; */
   overflow: hidden;
-  padding: 10px;
   background: black;
   color: white;
   font-size: 0.8rem;
-  display: flex;
-  flex-wrap: wrap;
+  /* display: flex; */
+  /* flex-wrap: wrap; */
+  -webkit-user-select: none;
   user-select: none;
+  border-radius: 3px;
+  box-shadow: 0 0 5px 0 black;
 }
 
 ._historyNavigator > div {
@@ -151,9 +153,11 @@ div svg {
 }
 
 ._historyContainer {
-  height: 30px;
+  height: 20px;
   display: flex;
-  justify-content: space-between;
+  justify-content: space-around;
+  background: dimgray;
+  padding: 5px 0;
 }
 
 ._historyButton {
@@ -163,15 +167,15 @@ div svg {
 }
 
 ._name {
-  height: 30px;
+  padding: 5px;
+  margin: auto;
 }
 
 ._moveList {
-  height: 110px;
+  height: 120px;
   overflow-y: auto;
   display: flex;
   flex-wrap: wrap;
-  padding: 5px;
   font-size: 0.9rem;
   align-content: flex-start;
 }
@@ -179,19 +183,24 @@ div svg {
 ._moveRow {
   display: flex;
   width: 100%;
+  height: 30px;
 }
 
 ._moveNumber {
-  margin-right: 8px;
+  width: 20%;
+  padding: 5px 0;
+  text-align: center;
+  background: dimgray;
 }
 
 ._move {
-  width: 100%;
+  width: 40%;
   cursor: pointer;
+  padding: 5px;
 }
 
 ._move:hover {
-  background-color:rgba(20, 85, 0, 1)
+  background-color: rgba(20, 85, 0, 1);
 }
 
 ._move._selected {
@@ -199,5 +208,8 @@ div svg {
 }
 
 ._gameProposalContainer {
-  height: 50px;
+  margin: 10px 0 0 5px;
+  height: 30px;
+  display: flex;
+  justify-content: space-evenly;
 }

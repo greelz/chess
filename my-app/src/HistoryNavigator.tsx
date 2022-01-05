@@ -25,8 +25,11 @@ export default function HistoryNavigator(
   for (let i = 0; i < props.moveList.length; i += 2) {
     moveListContent.push(
       <div className="_moveRow">
-        <div className="_moveNumber">{i / 2 + 1}.</div>
+        <div key={i + "."} className="_moveNumber">
+          {i / 2 + 1}.
+        </div>
         <div
+          key={i}
           onClick={() => props.jumpToPosition(i)}
           className={`_move ${
             props.currentPosition === i + 1 ? "_selected" : ""
@@ -35,6 +38,7 @@ export default function HistoryNavigator(
           {props.moveList[i]}
         </div>
         <div
+          key={i + ","}
           onClick={() => props.jumpToPosition(i + 1)}
           className={`_move ${
             props.currentPosition === i + 2 ? "_selected" : ""
@@ -55,7 +59,7 @@ export default function HistoryNavigator(
           props.currentPosition
         ] as HTMLDivElement;
       if (rowToScrollTo) {
-        moveListRef.current.scrollTo(0, rowToScrollTo.offsetTop + 20);
+        moveListRef.current.scrollTo(0, rowToScrollTo.offsetTop);
       }
     }
   }, [props.currentPosition]);
@@ -87,9 +91,15 @@ export default function HistoryNavigator(
         {moveListContent}
       </div>
       <div className="_gameProposalContainer">
-        <div className="_gameProposal takeback"></div>
-        <div className="_gameProposal draw"></div>
-        <div className="_gameProposal resign"></div>
+        <div className="_gameProposal">
+          <LastMove />
+        </div>
+        <div className="_gameProposal">
+          <LastMove />
+        </div>
+        <div className="_gameProposal">
+          <LastMove />
+        </div>
       </div>
       <div className="_name">{props.myName}</div>
     </div>

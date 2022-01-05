@@ -6,7 +6,7 @@ import Game from "./Game";
 function App() {
   return (
     <>
-      <Game startingFen="rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d5 1 2" />
+      <Game startingFen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq d5 1 2" />
     </>
   );
 }

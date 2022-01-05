@@ -1,5 +1,3 @@
-import { getByPlaceholderText } from "@testing-library/react";
-import { chdir } from "process";
 import {
   ChessPiece,
   ChessSVG,
@@ -70,7 +68,17 @@ export function doEverything(f: string) {
   }
 }
 
-export function calculatePgn(
+export function calculateGamePgn(gameHistory: string[], isWhitesTurn: boolean): string[] {
+  console.log("Calculating game pgn...");
+  let ret: string[] = [];
+  for (let i = 1; i < gameHistory.length; ++i) {
+    ret.push(calculatePgn(gameHistory[i - 1], gameHistory[i], isWhitesTurn));
+    isWhitesTurn = !isWhitesTurn;
+  }
+  return ret;
+}
+
+function calculatePgn(
   f1: string,
   f2: string,
   isWhitesTurn: boolean,

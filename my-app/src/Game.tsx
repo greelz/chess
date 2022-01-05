@@ -1,8 +1,8 @@
 import Board from "./Board";
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
+  calculateGamePgn,
   calculateNewCastleRights,
-  calculatePgn,
   deepCopyFunction,
   doEverything,
   getBoardSpotFromPiece,
@@ -21,14 +21,14 @@ interface IGameProps {
 export default function Game(props: IGameProps): JSX.Element {
   function doNewMove(newFen: string) {
     // Todo -- add to PGN list, keep in sync
-    setGamePGN([
-      ...gamePgn,
-      calculatePgn(
-        gameHistory[gameHistory.length - 1],
-        newFen,
-        isWhitesTurn || false
-      ),
-    ]);
+    // setGamePGN([
+    //   ...gamePgn,
+    //   calculatePgn(
+    //     gameHistory[gameHistory.length - 1],
+    //     newFen,
+    //     isWhitesTurn || false
+    //   ),
+    // ]);
     setGameHistory([...gameHistory, newFen]);
     setCurrentPointInHistory(gameHistory.length);
   }
@@ -286,7 +286,6 @@ export default function Game(props: IGameProps): JSX.Element {
   // Game management via FEN
   const [currentPointInHistory, setCurrentPointInHistory] = useState<number>(0);
   const [gameHistory, setGameHistory] = useState<string[]>([props.startingFen]);
-  const [gamePgn, setGamePGN] = useState<string[]>([]);
   const [selectedSquare, setSelectedSquare] = useState<ISquareCoreProps>();
   const [dragging, setDragging] = useState(false);
 
@@ -294,7 +293,6 @@ export default function Game(props: IGameProps): JSX.Element {
   const boardRef = useRef<HTMLDivElement>(null);
 
   // Calculated properties from state
-
   const currentFen = gameHistory[currentPointInHistory];
   const fenTranslation = useMemo(() => doEverything(currentFen), [currentFen]);
   const {
@@ -307,6 +305,11 @@ export default function Game(props: IGameProps): JSX.Element {
     isInCheck,
     allPossibleMoves,
   } = fenTranslation;
+
+  const gamePgn = useMemo(
+    () => calculateGamePgn(gameHistory, props.startingFen.includes(" w ")),
+    [gameHistory, props.startingFen]
+  );
 
   const selectedBoardSpot = selectedSquare
     ? getBoardSpotFromPiece(selectedSquare)
