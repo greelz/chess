@@ -5,6 +5,7 @@ import { ReactComponent as GoBack } from "./images/step-backward-solid.svg";
 import { ReactComponent as GoForward } from "./images/step-forward-solid.svg";
 import { ReactComponent as Flip } from "./images/socks-solid.svg";
 import { useEffect, useRef } from "react";
+import { isOnScreen } from "./Helpers";
 
 interface IHistoryNavigatorProps {
   opponentName: string;
@@ -53,13 +54,21 @@ export default function HistoryNavigator(
   const moveListRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (props.currentPosition && moveListRef.current) {
-      const rowToScrollTo: HTMLDivElement =
-        moveListRef.current.getElementsByClassName("_move")[
-          props.currentPosition
-        ] as HTMLDivElement;
-      if (rowToScrollTo) {
-        moveListRef.current.scrollTo(0, rowToScrollTo.offsetTop);
+    console.log(props.currentPosition);
+    if (moveListRef.current) {
+      if (props.currentPosition === 0) {
+        console.log("scrolling top...");
+        moveListRef.current.scrollTop = 0;
+      } else {
+        const rowToScrollTo: HTMLDivElement =
+          moveListRef.current.getElementsByClassName("_move")[
+            props.currentPosition - 1
+          ] as HTMLDivElement;
+        
+        if (!isOnScreen(rowToScrollTo, moveListRef.current)) {
+          rowToScrollTo.scrollIntoView();
+        }
+        //moveListRef.current.scrollTop = rowToScrollTo.offsetTop;
       }
     }
   }, [props.currentPosition]);
@@ -105,3 +114,4 @@ export default function HistoryNavigator(
     </div>
   );
 }
+

@@ -78,6 +78,17 @@ export function calculateGamePgn(gameHistory: string[], isWhitesTurn: boolean): 
   return ret;
 }
 
+export function isOnScreen(moveElem: HTMLDivElement, moveListElem: HTMLDivElement)
+{
+  const height = moveListElem.clientHeight;
+  const scrollPos = moveListElem.scrollTop + moveListElem.offsetTop;
+  const elemPos = moveElem.offsetTop;
+  if (elemPos >= scrollPos && elemPos < (scrollPos + height)) {
+    return true;
+  }
+  return false;
+}
+
 function calculatePgn(
   f1: string,
   f2: string,
