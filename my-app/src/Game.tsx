@@ -1,36 +1,30 @@
 import Board from "./Board";
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
-  calculateGamePgn,
   calculateNewCastleRights,
-  deepCopyFunction,
-  doEverything,
+  calculatePgn,
+  generateStateFromFen,
   getBoardSpotFromPiece,
   getColumnAndRowFromBoardSpot,
-  getRowAndColumnFromPiece,
-  translateSquaresToFen,
+  IGameState,
+  moveToSquare,
 } from "./Helpers";
 import { ISquareCoreProps } from "./Square";
-import { ChessPiece, IChessPiece } from "./Interfaces";
+import { ChessPiece } from "./Interfaces";
 import HistoryNavigator from "./HistoryNavigator";
+import FieldAndLabel from "./FieldAndLabel";
 
 interface IGameProps {
-  startingFen: string;
+  startingFen?: string;
 }
 
 export default function Game(props: IGameProps): JSX.Element {
-  function doNewMove(newFen: string) {
-    // Todo -- add to PGN list, keep in sync
-    // setGamePGN([
-    //   ...gamePgn,
-    //   calculatePgn(
-    //     gameHistory[gameHistory.length - 1],
-    //     newFen,
-    //     isWhitesTurn || false
-    //   ),
-    // ]);
-    setGameHistory([...gameHistory, newFen]);
-    setCurrentPointInHistory(gameHistory.length);
+  //#region Game Functions
+  function doNewMove(newFen: string): void {
+    const moveData = generateStateFromFen(newFen);
+    setGameHistory([...gameState, moveData]);
+    setCurrentPointInHistory(gameState.length);
+    setGamePgn([...gamePgn, calculatePgn(gameState[gameState.length - 1], moveData)]);
   }
 
   function deselectSelectedSquare() {
@@ -60,7 +54,7 @@ export default function Game(props: IGameProps): JSX.Element {
     squareClicked: ISquareCoreProps,
     isWhitesTurn: boolean
   ): boolean {
-    if (currentPointInHistory !== gameHistory.length - 1) return false;
+    if (currentPointInHistory !== gameState.length - 1) return false;
     if (squareClicked.occupiedPiece && squareClicked !== selectedSquare) {
       if (
         (isWhitesTurn && squareClicked.occupiedPiece.color === "white") ||
@@ -130,7 +124,7 @@ export default function Game(props: IGameProps): JSX.Element {
 
     // Fullmove number
     const inc = isWhitesTurn ? 0 : 1;
-    const newFullMoveNumber = (fullmoveNumber || 0) + inc;
+    const newFullMoveNumber = (fullmoveNumber || 1) + inc;
 
     return {
       nextTurn,
@@ -148,75 +142,16 @@ export default function Game(props: IGameProps): JSX.Element {
     }
   }
 
-  function moveToSquare(
-    targetSquare: ISquareCoreProps,
-    movingSquare: ISquareCoreProps
-  ): string | undefined {
-    const squaresCopy: ISquareCoreProps[][] = deepCopyFunction(squares);
-    if (!movingSquare.occupiedPiece) return;
-    const {
-      row: targetRow,
-      column: targetCol,
-      success,
-    } = getRowAndColumnFromPiece(targetSquare);
-    const {
-      row: movingRow,
-      column: movingCol,
-      success: success2,
-    } = getRowAndColumnFromPiece(movingSquare);
-
-    const pieceCopy: IChessPiece = deepCopyFunction(movingSquare.occupiedPiece);
-
-    // Deal with special cases
-
-    // Help with castling if we're doing it
-    if (movingSquare.occupiedPiece.piece.name === ChessPiece.King) {
-      if (Math.abs(movingCol - targetCol) === 2) {
-        // We need to also move the rook to the square next to the king
-        let rookColumn = 0,
-          castlingLong = true;
-        if (targetCol === 6) {
-          rookColumn = 7;
-          castlingLong = false;
-        }
-
-        const rookPiece: IChessPiece = deepCopyFunction(
-          squaresCopy[movingRow][rookColumn].occupiedPiece
-        );
-        const columnToMoveTo = Math.abs(castlingLong ? 3 : 2 - rookColumn);
-        squaresCopy[movingRow][columnToMoveTo].occupiedPiece = rookPiece;
-        squaresCopy[movingRow][rookColumn].occupiedPiece = undefined;
-      }
-    }
-
-    // Promote a pawn to a queen if it hits the last row
-    if (
-      movingSquare.occupiedPiece.piece.name === ChessPiece.Pawn &&
-      ((targetRow === 7 && !isWhitesTurn) || (targetRow === 0 && isWhitesTurn))
-    ) {
-      pieceCopy.piece.name = ChessPiece.Queen;
-    }
-
-    // Remove the pawn captured via en passant if that's what we did
-    if (
-      movingSquare.occupiedPiece.piece.name === ChessPiece.Pawn &&
-      getBoardSpotFromPiece(targetSquare).toLowerCase() ===
-        enPassantTarget?.toLowerCase()
-    ) {
-      squaresCopy[movingRow][targetCol].occupiedPiece = undefined;
-    }
-
-    if (success && success2) {
-      squaresCopy[targetRow][targetCol].occupiedPiece = pieceCopy;
-      squaresCopy[movingRow][movingCol].occupiedPiece = undefined;
-      deselectSelectedSquare();
-      return translateSquaresToFen(squaresCopy);
-    }
-  }
-
   function doFullMove(squareClicked: ISquareCoreProps) {
     if (!selectedSquare) return;
-    const newFenInit = moveToSquare(squareClicked, selectedSquare);
+    const newFenInit = moveToSquare(
+      squareClicked,
+      selectedSquare,
+      squares,
+      isWhitesTurn || false,
+      enPassantTarget || ""
+    );
+    deselectSelectedSquare();
     if (!newFenInit) return;
 
     var {
@@ -233,6 +168,7 @@ export default function Game(props: IGameProps): JSX.Element {
 
   function dragHandler(e: React.DragEvent<HTMLDivElement>, boardSpot?: string) {
     if (!boardSpot) return;
+    if (isWhitesTurn === undefined) return; // If we are sent an incomplete starting FEN notation, do nothing.
     if (e.type === "mousedown") {
       e.preventDefault();
       if (e.button !== 0) {
@@ -277,15 +213,22 @@ export default function Game(props: IGameProps): JSX.Element {
     }
   }
 
-  function changeCurrentPIH(point: number) {
-    if (point > -1 && point <= gameHistory.length - 1) {
+  function changeCurrentPointInHistory(point: number) {
+    if (point > -1 && point <= gameState.length - 1) {
       setCurrentPointInHistory(point);
     }
   }
 
   // Game management via FEN
+  const [gameState, setGameHistory] = useState<IGameState[]>([
+    generateStateFromFen(
+      props.startingFen ||
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    ),
+  ]);
+
+  const [gamePgn, setGamePgn] = useState<string[]>([]);
   const [currentPointInHistory, setCurrentPointInHistory] = useState<number>(0);
-  const [gameHistory, setGameHistory] = useState<string[]>([props.startingFen]);
   const [selectedSquare, setSelectedSquare] = useState<ISquareCoreProps>();
   const [dragging, setDragging] = useState(false);
 
@@ -293,8 +236,12 @@ export default function Game(props: IGameProps): JSX.Element {
   const boardRef = useRef<HTMLDivElement>(null);
 
   // Calculated properties from state
-  const currentFen = gameHistory[currentPointInHistory];
-  const fenTranslation = useMemo(() => doEverything(currentFen), [currentFen]);
+  const gamePgnString = gamePgn.map((val, idx) => {
+    const number = (idx % 2 === 0) ? ` ${idx / 2 + 1}.` : "";
+    return `${number} ${val}`;
+  }).join("");
+
+  const currentGameHistory = gameState[currentPointInHistory];
   const {
     squares,
     isWhitesTurn,
@@ -304,12 +251,7 @@ export default function Game(props: IGameProps): JSX.Element {
     fullmoveNumber,
     isInCheck,
     allPossibleMoves,
-  } = fenTranslation;
-
-  const gamePgn = useMemo(
-    () => calculateGamePgn(gameHistory, props.startingFen.includes(" w ")),
-    [gameHistory, props.startingFen]
-  );
+  } = currentGameHistory;
 
   const selectedBoardSpot = selectedSquare
     ? getBoardSpotFromPiece(selectedSquare)
@@ -355,7 +297,7 @@ export default function Game(props: IGameProps): JSX.Element {
       <Board
         bRef={boardRef}
         grabbyCursor={dragging}
-        squares={squares}
+        squares={currentGameHistory.squares}
         selectedBoardSpot={selectedBoardSpot}
         possibleMoves={allPossibleCurrentMoves || []}
         onDragOver={(e, s) => dragHandler(e, s)}
@@ -371,12 +313,22 @@ export default function Game(props: IGameProps): JSX.Element {
         opponentName="jordantas21"
         moveList={gamePgn}
         currentPosition={currentPointInHistory}
-        goBack={() => changeCurrentPIH(currentPointInHistory - 1)}
-        goForward={() => changeCurrentPIH(currentPointInHistory + 1)}
-        goBackToBeginning={() => changeCurrentPIH(0)}
-        goToEnd={() => changeCurrentPIH(gameHistory.length - 1)}
-        jumpToPosition={(pos: number) => changeCurrentPIH(pos + 1)}
+        goBack={() => changeCurrentPointInHistory(currentPointInHistory - 1)}
+        goForward={() => changeCurrentPointInHistory(currentPointInHistory + 1)}
+        goBackToBeginning={() => changeCurrentPointInHistory(0)}
+        goToEnd={() => changeCurrentPointInHistory(gameState.length - 1)}
+        jumpToPosition={(pos: number) => changeCurrentPointInHistory(pos + 1)}
       />
+      <table className="_fenPgnTable">
+        <tr>
+          <td>FEN</td>
+          <td className="_tableData">{gameState[currentPointInHistory].fen}</td>
+        </tr>
+        <tr>
+          <td>PGN</td>
+          <td className="_tableData">{gamePgnString}</td>
+        </tr>
+      </table>
     </div>
   );
 }

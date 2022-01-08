@@ -25,7 +25,7 @@ export default function HistoryNavigator(
   let moveListContent: JSX.Element[] = [];
   for (let i = 0; i < props.moveList.length; i += 2) {
     moveListContent.push(
-      <div className="_moveRow">
+      <div key={i + "|"} className="_moveRow">
         <div key={i + "."} className="_moveNumber">
           {i / 2 + 1}.
         </div>
@@ -54,10 +54,8 @@ export default function HistoryNavigator(
   const moveListRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    console.log(props.currentPosition);
     if (moveListRef.current) {
       if (props.currentPosition === 0) {
-        console.log("scrolling top...");
         moveListRef.current.scrollTop = 0;
       } else {
         const rowToScrollTo: HTMLDivElement =

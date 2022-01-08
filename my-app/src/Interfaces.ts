@@ -12,6 +12,11 @@ export interface IChessPieceInfo {
   iconSvg: ChessSVG;
 }
 
+export interface IPieceLocation {
+  name: ChessPiece;
+  boardSpot: string;
+}
+
 export interface IPossibleMoves {
   allMoves: Map<string, string[]>;
   possibleMoves: number;

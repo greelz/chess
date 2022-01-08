@@ -4,7 +4,7 @@ body {
   margin: 0;
   width: 100%;
   height: 100%;
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
 #root {
@@ -212,4 +212,23 @@ div svg {
   height: 30px;
   display: flex;
   justify-content: space-evenly;
+}
+
+._fenPgnTable {
+  border-spacing: 5px 10px;
+  font-size: 0.9rem;
+  border-collapse: separate;
+  box-sizing: border-box;
+  text-indent: initial;
+}
+
+
+._fenPgnTable tr {
+  height: 30px;
+  vertical-align: middle;
+}
+
+td._tableData { 
+  border: 1px solid black;
+  padding: 5px;
 }

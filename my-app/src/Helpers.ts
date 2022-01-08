@@ -5,11 +5,23 @@ import {
   IChessPiece,
   IPossibleMoves,
 } from "./Interfaces";
-import { ISquareCoreProps } from "./Square";
+import { colLettersArray, ISquareCoreProps } from "./Square";
 
-export function doEverything(f: string) {
+export interface IGameState {
+  squares: ISquareCoreProps[][];
+  fen: string;
+  isWhitesTurn?: boolean;
+  castlingRights?: string;
+  enPassantTarget?: string;
+  halfmoveClock?: number;
+  fullmoveNumber?: number;
+  isInCheck?: boolean;
+  allPossibleMoves?: IPossibleMoves;
+}
+
+export function generateStateFromFen(f: string): IGameState {
   const space = f.indexOf(" ");
-  const fenPieces = f.substring(0, space);
+  const fenPieces = f.substring(0, space === -1 ? undefined : space);
   const remain = f.substring(space + 1).split(" ");
 
   const squaresOut = translateFenToSquaresArray(fenPieces);
@@ -23,7 +35,7 @@ export function doEverything(f: string) {
     console.error(
       "Invalid FEN notation sent over, couldn't find extra information."
     );
-    return { squares: squaresOut };
+    return { squares: squaresOut, fen: f };
   } else {
     const [turn, castleRights, enPassantTarget, halfMoveClock, fullMoveNumber] =
       remain;
@@ -32,6 +44,7 @@ export function doEverything(f: string) {
       console.error(
         "Invalid FEN notation sent over, couldn't find all add'l info."
       );
+      return { squares: squaresOut, fen: f };
     }
 
     let halfMoveClockNum = -1,
@@ -57,6 +70,7 @@ export function doEverything(f: string) {
 
     return {
       squares: squaresOut,
+      fen: f,
       isWhitesTurn: isWhitesTurn,
       castlingRights: castleRights,
       enPassantTarget: enPassantTarget,
@@ -68,48 +82,99 @@ export function doEverything(f: string) {
   }
 }
 
-export function calculateGamePgn(gameHistory: string[], isWhitesTurn: boolean): string[] {
-  console.log("Calculating game pgn...");
+export function moveToSquare(
+  targetSquare: ISquareCoreProps,
+  movingSquare: ISquareCoreProps,
+  squares: ISquareCoreProps[][],
+  isWhitesTurn: boolean,
+  enPassantTarget: string
+): string | undefined {
+  const squaresCopy: ISquareCoreProps[][] = deepCopyFunction(squares);
+  if (!movingSquare.occupiedPiece) return;
+  const {
+    row: targetRow,
+    column: targetCol,
+    success,
+  } = getRowAndColumnFromPiece(targetSquare);
+  const {
+    row: movingRow,
+    column: movingCol,
+    success: success2,
+  } = getRowAndColumnFromPiece(movingSquare);
+
+  const pieceCopy: IChessPiece = deepCopyFunction(movingSquare.occupiedPiece);
+
+  // Deal with special cases
+
+  // Help with castling if we're doing it
+  if (movingSquare.occupiedPiece.piece.name === ChessPiece.King) {
+    if (Math.abs(movingCol - targetCol) === 2) {
+      // We need to also move the rook to the square next to the king
+      let rookColumn = 0,
+        castlingLong = true;
+      if (targetCol === 6) {
+        rookColumn = 7;
+        castlingLong = false;
+      }
+
+      const rookPiece: IChessPiece = deepCopyFunction(
+        squaresCopy[movingRow][rookColumn].occupiedPiece
+      );
+      const columnToMoveTo = Math.abs(castlingLong ? 3 : 2 - rookColumn);
+      squaresCopy[movingRow][columnToMoveTo].occupiedPiece = rookPiece;
+      squaresCopy[movingRow][rookColumn].occupiedPiece = undefined;
+    }
+  }
+
+  // Promote a pawn to a queen if it hits the last row
+  if (
+    movingSquare.occupiedPiece.piece.name === ChessPiece.Pawn &&
+    ((targetRow === 7 && !isWhitesTurn) || (targetRow === 0 && isWhitesTurn))
+  ) {
+    pieceCopy.piece.name = ChessPiece.Queen;
+  }
+
+  // Remove the pawn captured via en passant if that's what we did
+  if (
+    movingSquare.occupiedPiece.piece.name === ChessPiece.Pawn &&
+    getBoardSpotFromPiece(targetSquare) === enPassantTarget
+  ) {
+    squaresCopy[movingRow][targetCol].occupiedPiece = undefined;
+  }
+
+  if (success && success2) {
+    squaresCopy[targetRow][targetCol].occupiedPiece = pieceCopy;
+    squaresCopy[movingRow][movingCol].occupiedPiece = undefined;
+    return translateSquaresToFen(squaresCopy);
+  }
+}
+
+export function calculateGamePgn(gameStateArray: IGameState[]): string[] {
+  let isWhitesTurn = true; // White always starts first in chess...
   let ret: string[] = [];
-  for (let i = 1; i < gameHistory.length; ++i) {
-    ret.push(calculatePgn(gameHistory[i - 1], gameHistory[i], isWhitesTurn));
+  for (let i = 1; i < gameStateArray.length; ++i) {
+    ret.push(calculatePgn(gameStateArray[i - 1], gameStateArray[i]));
     isWhitesTurn = !isWhitesTurn;
   }
   return ret;
 }
 
-export function isOnScreen(moveElem: HTMLDivElement, moveListElem: HTMLDivElement)
-{
-  const height = moveListElem.clientHeight;
-  const scrollPos = moveListElem.scrollTop + moveListElem.offsetTop;
-  const elemPos = moveElem.offsetTop;
-  if (elemPos >= scrollPos && elemPos < (scrollPos + height)) {
-    return true;
+function arePiecesTheSame(p1: ISquareCoreProps, p2: ISquareCoreProps): boolean {
+  if (p1.occupiedPiece && p2.occupiedPiece) {
+    return (
+      p1.occupiedPiece.color === p2.occupiedPiece.color &&
+      p1.occupiedPiece.piece.name === p2.occupiedPiece.piece.name
+    );
+  } else {
+    // comparing for undefined === undefined
+    return p1.occupiedPiece === p2.occupiedPiece;
   }
-  return false;
 }
 
-function calculatePgn(
-  f1: string,
-  f2: string,
-  isWhitesTurn: boolean,
-): string {
-  const s1 = translateFenToSquaresArray(f1);
-  const s2 = translateFenToSquaresArray(f2);
-
-  const arePiecesTheSame = (p1: ISquareCoreProps, p2: ISquareCoreProps) => {
-    if (p1.occupiedPiece && p2.occupiedPiece) {
-      return (
-        p1.occupiedPiece.color === p2.occupiedPiece.color &&
-        p1.occupiedPiece.piece.name === p2.occupiedPiece.piece.name
-      );
-    } else {
-      // comparing for undefined === undefined
-      return p1.occupiedPiece === p2.occupiedPiece;
-    }
-  };
-
+export function calculatePgn(g1: IGameState, g2: IGameState): string {
   let piecesDifferences: ISquareCoreProps[][] = [];
+  const s1 = g1.squares;
+  const s2 = g2.squares;
 
   for (let i = 0; i < 8; ++i) {
     for (let j = 0; j < 8; ++j) {
@@ -130,28 +195,30 @@ function calculatePgn(
     const [boardSpot1, boardSpot2] = piecesDifferences;
     const [s1, s1b] = boardSpot1;
     const [s2, s2b] = boardSpot2;
+    let initialSquare: ISquareCoreProps | undefined = undefined;
+    let targetSquare: ISquareCoreProps | undefined = undefined;
+    let targetBoardSpot = "";
+    let wasSomethingCaptured = false;
 
     if (s1.occupiedPiece && s2.occupiedPiece) {
       // something was captured, find the empty spot (which indicates that's where the piece moved from)
-      const capturedPiece = s1b.occupiedPiece
-        ? s1.occupiedPiece
-        : s2.occupiedPiece;
-      const squareThatMoved = s1b.occupiedPiece ? s2 : s1;
-      const destinationBoardSpot = s1b.occupiedPiece
-        ? getBoardSpotFromPiece(s1b)
-        : getBoardSpotFromPiece(s2b);
-      retVal = `${getPieceThatMovedLetter(
-        squareThatMoved,
-        true
-      )}x${destinationBoardSpot.toLowerCase()}`;
+      wasSomethingCaptured = true;
+      initialSquare = s1b.occupiedPiece ? s2 : s1;
+      targetSquare = s1b.occupiedPiece ? s1b : s2b; // Final destination, should always be "b"
+      targetBoardSpot = getBoardSpotFromPiece(targetSquare);
     } else {
-      // We either moved s1 to s2, or s2 to s1
-      const destinationSquare = s1.occupiedPiece ? s2b : s1b;
-      retVal = `${getPieceThatMovedLetter(
-        destinationSquare,
-        false
-      )}${getBoardSpotFromPiece(destinationSquare).toLowerCase()}`;
+      // We either moved s1 to s2b, or s2 to s1b
+      initialSquare = s1.occupiedPiece ? s1 : s2;
+      targetSquare = s1.occupiedPiece ? s2b : s1b; // Final destination, should always be "b"
+      targetBoardSpot = getBoardSpotFromPiece(targetSquare);
     }
+
+    const movingLetter = getPieceThatMovedLetter(initialSquare, wasSomethingCaptured);
+    const specialIdentifier = getSpecialRowNumberOrColumnName(g1, initialSquare, targetSquare);
+    const capturedLetter = wasSomethingCaptured ? "x" : "";
+    const promotionLetters = getPromotionLetters(g1, initialSquare, targetSquare);
+    retVal = `${movingLetter}${specialIdentifier}${capturedLetter}${targetBoardSpot}${promotionLetters}`;
+
   } else if (len === 3) {
     // en passant capture
     const [boardSpot1, boardSpot2, boardSpot3] = piecesDifferences;
@@ -160,30 +227,114 @@ function calculatePgn(
     const [s3, s3b] = boardSpot3;
 
     // Whichever of s1b, s2b, and s3b has a piece is the destination
-    const destinationSquare = s1b.occupiedPiece ? s1b : (s2b.occupiedPiece ? s2b : s3b);
+    const destinationSquare = s1b.occupiedPiece
+      ? s1b
+      : s2b.occupiedPiece
+      ? s2b
+      : s3b;
     const destinationPieceColor = destinationSquare.occupiedPiece?.color;
 
     // Originating row is whichever row matches the destination square's piece color
     const [p1, p2] = [s1.occupiedPiece, s2.occupiedPiece];
-    const originalColumn = ((p1?.color === destinationPieceColor) ? getBoardSpotFromPiece(s1) : (
-      p2?.color === destinationPieceColor ? getBoardSpotFromPiece(s2) : getBoardSpotFromPiece(s3)))[0].toLowerCase();
+    const originalColumn = (
+      p1?.color === destinationPieceColor
+        ? getBoardSpotFromPiece(s1)
+        : p2?.color === destinationPieceColor
+        ? getBoardSpotFromPiece(s2)
+        : getBoardSpotFromPiece(s3)
+    )[0];
 
-    retVal = `${originalColumn}x${getBoardSpotFromPiece(destinationSquare).toLowerCase()}`;
-
-
+    retVal = `${originalColumn}x${getBoardSpotFromPiece(destinationSquare)}`;
   } else if (len === 4) {
     // castling
     // Just need to determine if the rook moved two or three squares
     // We castled queen-side if the rook lands on the d file...
-    const p2 = piecesDifferences[1][0]
-    retVal = p2.columnName === "C" ? "O-O-O" : "O-O";
+    const p2 = piecesDifferences[1][0];
+    retVal = p2.columnName === "c" ? "O-O-O" : "O-O";
   }
 
-  const isCheck = isInCheck(s2, !isWhitesTurn);
-  const moves = getAllPossibleMoves(s2, !isWhitesTurn);
-  const isCheckmate = isCheck && moves.possibleMoves === 0;
+  const isCheck = g2.isInCheck;
+  const moves = g2.allPossibleMoves;
+  const isCheckmate = isCheck && moves && moves.possibleMoves === 0;
 
   return `${retVal}${isCheck ? (isCheckmate ? "#" : "+") : ""}`;
+}
+
+function getPromotionLetters(g: IGameState, initialSquare: ISquareCoreProps, targetSquare: ISquareCoreProps) {
+  const targetColumn = targetSquare.rowNumber;
+  const pieceThatMoved = initialSquare.occupiedPiece?.piece.name;
+
+  if (pieceThatMoved === ChessPiece.Pawn) {
+    if (targetColumn === 1 || targetColumn === 8) {
+      // The pawn promoted this turn, return what it promoted to
+      return `=${getPieceThatMovedLetter(targetSquare, false)}`;
+    }
+  }
+  return "";
+}
+
+function getSpecialRowNumberOrColumnName(
+  g: IGameState,
+  initialSquare: ISquareCoreProps,
+  targetSquare: ISquareCoreProps
+): number | typeof colLettersArray[number] | ""  {
+  const initialBoardSpot = getBoardSpotFromPiece(initialSquare);
+  const targetBoardSpot = getBoardSpotFromPiece(targetSquare);
+  const pieceThatMoved = initialSquare.occupiedPiece?.piece.name;
+  if (pieceThatMoved && pieceThatMoved !== ChessPiece.Pawn && g.allPossibleMoves) {
+    // Find all other pieces that could have moved to the target board spot
+    const squaresThatCouldAlsoMoveToTarget = getAllKeysThatContainValue(
+      targetBoardSpot,
+      g.allPossibleMoves.allMoves
+    );
+    for (let i = 0; i < squaresThatCouldAlsoMoveToTarget.length; ++i) {
+      const boardSpotToCheck = squaresThatCouldAlsoMoveToTarget[i];
+      if (boardSpotToCheck !== initialBoardSpot) {
+        const squareToCheck = getPieceFromBoardSpot(
+          boardSpotToCheck,
+          g.squares
+        );
+        if (squareToCheck?.occupiedPiece?.piece.name === pieceThatMoved) {
+          //${pieceThatMoved} could also have jumped from ${boardSpotToCheck}
+
+          // We need to add some information about the piece that moved, first try the column name
+          // And if those match, use the row number
+          if (initialSquare.columnName !== squareToCheck.columnName) {
+            return initialSquare.columnName;
+          } else if (initialSquare.rowNumber !== squareToCheck.rowNumber) {
+            return initialSquare.rowNumber;
+          }
+        }
+      }
+    }
+  }
+  return ""; // Return nothing special to display if not necessary
+}
+
+function getAllKeysThatContainValue(
+  val: string,
+  kvPairs: Map<string, string[]>
+): string[] {
+  let retVal: string[] = [];
+  for (let [key, value] of kvPairs.entries()) {
+    if (value.includes(val)) {
+      retVal.push(key);
+    }
+  }
+  return retVal;
+}
+
+export function isOnScreen(
+  moveElem: HTMLDivElement,
+  moveListElem: HTMLDivElement
+) {
+  const height = moveListElem.clientHeight;
+  const scrollPos = moveListElem.scrollTop + moveListElem.offsetTop;
+  const elemPos = moveElem.offsetTop;
+  if (elemPos >= scrollPos && elemPos < scrollPos + height) {
+    return true;
+  }
+  return false;
 }
 
 function getPieceThatMovedLetter(piece: ISquareCoreProps, isCapture: boolean) {
@@ -205,10 +356,12 @@ function getPieceThatMovedLetter(piece: ISquareCoreProps, isCapture: boolean) {
       pieceThatMovedLetter = "R";
       break;
     case ChessPiece.Pawn:
-      if (isCapture)
-        pieceThatMovedLetter = getBoardSpotFromPiece(piece)[0].toLowerCase();
+      if (isCapture) pieceThatMovedLetter = getBoardSpotFromPiece(piece)[0];
       break;
   }
+
+  // Edge cases -> a non-pawn moves where a sibling could also move (consider all pieces b/c pawn promotions)
+
   return pieceThatMovedLetter;
 }
 
@@ -330,7 +483,7 @@ export function calculateNewCastleRights(
       );
     } else {
       // the rook is moving
-      const bs = getBoardSpotFromPiece(selectedSquare).toLowerCase();
+      const bs = getBoardSpotFromPiece(selectedSquare);
       if (bs === "a1" && isWhitesTurn) {
         castleRights = castleRights?.replace(removeQueensideWhite, "");
       } else if (bs === "a8" && !isWhitesTurn) {
@@ -759,6 +912,16 @@ export function getAllPossibleMoves(
   return { allMoves: dict, possibleMoves: totalPossibleMoves };
 }
 
+export function getPieceFromBoardSpot(
+  boardSpot: string,
+  squares: ISquareCoreProps[][]
+): ISquareCoreProps | undefined {
+  const { row, column, success } = getColumnAndRowFromBoardSpot(boardSpot);
+  if (success) {
+    return squares[row][column];
+  }
+}
+
 export function getColumnAndRowFromBoardSpot(boardSpot: string): IBoardSpot {
   const badReturn: IBoardSpot = { row: -1, column: -1, success: false };
   const cols = ["A", "B", "C", "D", "E", "F", "G", "H"];
@@ -949,11 +1112,9 @@ export function pushSafely(
     }
   }
 
-  const cols = ["A", "B", "C", "D", "E", "F", "G", "H"];
-
   squares[row][column] = {
     color: squareColor,
-    columnName: cols[column],
+    columnName: colLettersArray[column],
     rowNumber: 8 - row,
     occupiedPiece: piece,
   };

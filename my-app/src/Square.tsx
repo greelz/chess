@@ -17,11 +17,12 @@ export interface ISquareUIProps extends ISquareCoreProps {
   onDrop: React.DragEventHandler<HTMLDivElement>;
 }
 
+export const colLettersArray = ["a", "b", "c", "d", "e", "f", "g", "h"] as const;
 export interface ISquareCoreProps {
   color: "dark" | "light";
   occupiedPiece?: IChessPiece;
   rowNumber: number;
-  columnName: string;
+  columnName: typeof colLettersArray[number];
 }
 
 export interface ISquareProps extends ISquareUIProps {}
@@ -53,10 +54,8 @@ export function Square({
   columnName,
   canBeMovedTo,
   selected,
-  // onClick,
   onDragStart,
   onDragOver,
-  onDragEnter,
   onDrop,
 }: ISquareProps): JSX.Element {
   const pieceColor = occupiedPiece?.color;
@@ -103,11 +102,11 @@ export function Square({
         className={`_square ${backgroundColorClass}`}
       >
         {content}
-        {columnName === "A" ? (
+        {columnName === "a" ? (
           <div className="_rowNumber">{rowNumber}</div>
         ) : null}
         {rowNumber === 1 ? (
-          <div className="_columnName">{columnName}</div>
+          <div className="_columnName">{columnName.toUpperCase()}</div>
         ) : null}
       </div>
     </>
