@@ -1,5 +1,5 @@
 import Board from "./Board";
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   calculateNewCastleRights,
   calculatePgn,
@@ -12,7 +12,6 @@ import {
 import { ISquareCoreProps } from "./Square";
 import { ChessPiece } from "./Interfaces";
 import HistoryNavigator from "./HistoryNavigator";
-import FieldAndLabel from "./FieldAndLabel";
 
 interface IGameProps {
   startingFen?: string;
@@ -24,7 +23,10 @@ export default function Game(props: IGameProps): JSX.Element {
     const moveData = generateStateFromFen(newFen);
     setGameHistory([...gameState, moveData]);
     setCurrentPointInHistory(gameState.length);
-    setGamePgn([...gamePgn, calculatePgn(gameState[gameState.length - 1], moveData)]);
+    setGamePgn([
+      ...gamePgn,
+      calculatePgn(gameState[gameState.length - 1], moveData),
+    ]);
   }
 
   function deselectSelectedSquare() {
@@ -236,10 +238,12 @@ export default function Game(props: IGameProps): JSX.Element {
   const boardRef = useRef<HTMLDivElement>(null);
 
   // Calculated properties from state
-  const gamePgnString = gamePgn.map((val, idx) => {
-    const number = (idx % 2 === 0) ? ` ${idx / 2 + 1}.` : "";
-    return `${number} ${val}`;
-  }).join("");
+  const gamePgnString = gamePgn
+    .map((val, idx) => {
+      const number = idx % 2 === 0 ? ` ${idx / 2 + 1}.` : "";
+      return `${number} ${val}`;
+    })
+    .join("");
 
   const currentGameHistory = gameState[currentPointInHistory];
   const {
@@ -320,14 +324,18 @@ export default function Game(props: IGameProps): JSX.Element {
         jumpToPosition={(pos: number) => changeCurrentPointInHistory(pos + 1)}
       />
       <table className="_fenPgnTable">
-        <tr>
-          <td>FEN</td>
-          <td className="_tableData">{gameState[currentPointInHistory].fen}</td>
-        </tr>
-        <tr>
-          <td>PGN</td>
-          <td className="_tableData">{gamePgnString}</td>
-        </tr>
+        <tbody>
+          <tr>
+            <td>FEN</td>
+            <td className="_tableData">
+              {gameState[currentPointInHistory].fen}
+            </td>
+          </tr>
+          <tr>
+            <td>PGN</td>
+            <td className="_tableData">{gamePgnString}</td>
+          </tr>
+        </tbody>
       </table>
     </div>
   );
