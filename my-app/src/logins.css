@@ -1,0 +1,100 @@
+:root {
+  --input-padding: 1em;
+  --font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  --core-700: hsl(171, 47%, 12%);
+  --core-600: hsl(171, 47%, 22%);
+  --core-500: hsl(171, 47%, 32%);
+  --core-400: hsl(171, 47%, 42%);
+  --core-300: hsl(171, 47%, 52%);
+  --core-200: hsl(171, 47%, 62%);
+  --core-100: hsl(171, 47%, 72%);
+}
+
+body {
+  font-size: 1.1em;
+}
+
+.submitButton {
+  border: none;
+  color: white;
+  background-image: -webkit-gradient(linear, left top, right top, from(var(--core-400)), to(var(--core-500)));
+  background-image: linear-gradient(to right, var(--core-400), var(--core-500));
+  margin: 0;
+  padding: 1em 3.5em;
+  width: auto;
+  cursor: pointer;
+  -webkit-transition: -webkit-transform .1s ease-out;
+  transition: -webkit-transform .1s ease-out;
+  transition: transform .1s ease-out;
+  transition: transform .1s ease-out, -webkit-transform .1s ease-out;
+}
+
+.submitButton:hover, .submitButton:focus {
+  background-image: -webkit-gradient(linear, left top, right top, from(var(--core-500)), to(var(--core-600)));
+  background-image: linear-gradient(to right, var(--core-500), var(--core-600));
+}
+
+.userPasswordContainer {
+  -webkit-box-shadow: 0 0 45px 0 rgba(0, 0, 0, 0.2);
+          box-shadow: 0 0 45px 0 rgba(0, 0, 0, 0.2);
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+      -ms-flex-direction: column;
+          flex-direction: column;
+  -webkit-box-pack: justify;
+      -ms-flex-pack: justify;
+          justify-content: space-between;
+  gap: 1em;
+  background-color: white;
+  padding: 2em;
+}
+
+.userPasswordContainer > div {
+  position: relative;
+}
+
+label {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  font-size: 1em;
+  font-family: var(--font-family);
+  pointer-events: none;
+  -webkit-transition: -webkit-transform ease-out 0.1s;
+  transition: -webkit-transform ease-out 0.1s;
+  transition: transform ease-out 0.1s;
+  transition: transform ease-out 0.1s, -webkit-transform ease-out 0.1s;
+}
+
+label.hasText {
+  -webkit-transform: scale(0.8) translateY(-1.3em) translateX(-1.3em);
+          transform: scale(0.8) translateY(-1.3em) translateX(-1.3em);
+  padding: 0;
+}
+
+input {
+  width: 35ch;
+  font-size: 1em;
+  margin: 0;
+  padding: var(--input-padding);
+  font-family: var(--font-family);
+}
+
+._loginComponent {
+  min-height: 100vh;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-pack: center;
+      -ms-flex-pack: center;
+          justify-content: center;
+  -webkit-box-align: center;
+      -ms-flex-align: center;
+          align-items: center;
+  background-image: -webkit-gradient(linear, left top, right top, from(var(--core-100)), to(var(--core-400)));
+  background-image: linear-gradient(to right, var(--core-100), var(--core-400));
+}
+/*# sourceMappingURL=logins.css.map */
