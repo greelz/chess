@@ -8,6 +8,7 @@ import {
   getColumnAndRowFromBoardSpot,
   IGameState,
   moveToSquare,
+  gatherAdditionalMoveData,
 } from "./Helpers";
 import { ISquareCoreProps } from "./Square";
 import { ChessPiece } from "./Interfaces";
@@ -75,67 +76,6 @@ export default function Game(props: IGameProps): JSX.Element {
     setSelectedSquare(squareClicked);
   }
 
-  function gatherAdditionalMoveData(squareClicked: ISquareCoreProps) {
-    const nameOfPieceThatIsMoving = selectedSquare!.occupiedPiece?.piece.name;
-
-    let newEnPassantString = "-";
-    if (nameOfPieceThatIsMoving === ChessPiece.Pawn) {
-      if (squareClicked.columnName === selectedSquare!.columnName) {
-        if (
-          Math.abs(squareClicked.rowNumber - selectedSquare!.rowNumber) === 2
-        ) {
-          newEnPassantString =
-            selectedSquare!.columnName.toLowerCase() +
-            (squareClicked.rowNumber + selectedSquare!.rowNumber) / 2;
-        }
-      }
-    }
-
-    const nextTurn = isWhitesTurn ? "b" : "w";
-
-    // Castle rights
-    // They stay the same unless a king or rook moved
-    // KQkq is original castling rights
-    let castleRights = castlingRights;
-    castleRights = calculateNewCastleRights(
-      castlingRights,
-      nameOfPieceThatIsMoving,
-      castleRights,
-      isWhitesTurn || false,
-      selectedSquare!
-    );
-
-    // Moves since last pawn advance or piece capture
-    let newHalfmoveClock = (halfmoveClock || 0) + 1;
-    const isCapture = (
-      square1: ISquareCoreProps,
-      square2: ISquareCoreProps
-    ): boolean => {
-      return (
-        square1.occupiedPiece !== undefined &&
-        square2.occupiedPiece !== undefined
-      );
-    };
-
-    if (
-      nameOfPieceThatIsMoving === ChessPiece.Pawn ||
-      isCapture(selectedSquare!, squareClicked)
-    ) {
-      newHalfmoveClock = 0;
-    }
-
-    // Fullmove number
-    const inc = isWhitesTurn ? 0 : 1;
-    const newFullMoveNumber = (fullmoveNumber || 1) + inc;
-
-    return {
-      nextTurn,
-      castleRights,
-      newEnPassantString,
-      newHalfmoveClock,
-      newFullMoveNumber,
-    };
-  }
 
   function moveToSquareFromSpot(targetSpot: string, initialSpot: string) {
     const { row, column, success } = getColumnAndRowFromBoardSpot(targetSpot);
@@ -158,13 +98,13 @@ export default function Game(props: IGameProps): JSX.Element {
 
     var {
       nextTurn,
-      castleRights,
+      newCastleRights,
       newEnPassantString,
       newHalfmoveClock,
       newFullMoveNumber,
-    } = gatherAdditionalMoveData(squareClicked);
+    } = gatherAdditionalMoveData(squareClicked, selectedSquare, isWhitesTurn || false, castlingRights || "", halfmoveClock || 0, fullmoveNumber || 0);
 
-    let newFen = `${newFenInit} ${nextTurn} ${castleRights} ${newEnPassantString} ${newHalfmoveClock} ${newFullMoveNumber}`;
+    let newFen = `${newFenInit} ${nextTurn} ${newCastleRights} ${newEnPassantString} ${newHalfmoveClock} ${newFullMoveNumber}`;
     doNewMove(newFen);
   }
 

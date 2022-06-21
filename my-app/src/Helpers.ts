@@ -82,6 +82,71 @@ export function generateStateFromFen(f: string): IGameState {
   }
 }
 
+export function gatherAdditionalMoveData(
+  squareClicked: ISquareCoreProps,
+  selectedSquare: ISquareCoreProps,
+  isWhitesTurn: boolean,
+  castlingRights: string,
+  halfMoveClock: number, 
+  fullMoveNumber: number,
+) {
+  const nameOfPieceThatIsMoving = selectedSquare!.occupiedPiece?.piece.name;
+
+  let newEnPassantString = "-";
+  if (nameOfPieceThatIsMoving === ChessPiece.Pawn) {
+    if (squareClicked.columnName === selectedSquare!.columnName) {
+      if (Math.abs(squareClicked.rowNumber - selectedSquare!.rowNumber) === 2) {
+        newEnPassantString =
+          selectedSquare!.columnName.toLowerCase() +
+          (squareClicked.rowNumber + selectedSquare!.rowNumber) / 2;
+      }
+    }
+  }
+
+  const nextTurn = isWhitesTurn ? "b" : "w";
+
+  // Castle rights
+  // They stay the same unless a king or rook moved
+  // KQkq is original castling rights
+  let newCastleRights = calculateNewCastleRights(
+    castlingRights,
+    nameOfPieceThatIsMoving,
+    castlingRights,
+    isWhitesTurn || false,
+    selectedSquare!
+  ) || "";
+
+  // Moves since last pawn advance or piece capture
+  let newHalfmoveClock = (halfMoveClock || 0) + 1;
+  const isCapture = (
+    square1: ISquareCoreProps,
+    square2: ISquareCoreProps
+  ): boolean => {
+    return (
+      square1.occupiedPiece !== undefined && square2.occupiedPiece !== undefined
+    );
+  };
+
+  if (
+    nameOfPieceThatIsMoving === ChessPiece.Pawn ||
+    isCapture(selectedSquare!, squareClicked)
+  ) {
+    newHalfmoveClock = 0;
+  }
+
+  // Fullmove number
+  const inc = isWhitesTurn ? 0 : 1;
+  const newFullMoveNumber = (fullMoveNumber || 1) + inc;
+
+  return {
+    nextTurn,
+    newCastleRights,
+    newEnPassantString,
+    newHalfmoveClock,
+    newFullMoveNumber,
+  };
+}
+
 export function moveToSquare(
   targetSquare: ISquareCoreProps,
   movingSquare: ISquareCoreProps,
@@ -213,12 +278,22 @@ export function calculatePgn(g1: IGameState, g2: IGameState): string {
       targetBoardSpot = getBoardSpotFromPiece(targetSquare);
     }
 
-    const movingLetter = getPieceThatMovedLetter(initialSquare, wasSomethingCaptured);
-    const specialIdentifier = getSpecialRowNumberOrColumnName(g1, initialSquare, targetSquare);
+    const movingLetter = getPieceThatMovedLetter(
+      initialSquare,
+      wasSomethingCaptured
+    );
+    const specialIdentifier = getSpecialRowNumberOrColumnName(
+      g1,
+      initialSquare,
+      targetSquare
+    );
     const capturedLetter = wasSomethingCaptured ? "x" : "";
-    const promotionLetters = getPromotionLetters(g1, initialSquare, targetSquare);
+    const promotionLetters = getPromotionLetters(
+      g1,
+      initialSquare,
+      targetSquare
+    );
     retVal = `${movingLetter}${specialIdentifier}${capturedLetter}${targetBoardSpot}${promotionLetters}`;
-
   } else if (len === 3) {
     // en passant capture
     const [boardSpot1, boardSpot2, boardSpot3] = piecesDifferences;
@@ -260,7 +335,11 @@ export function calculatePgn(g1: IGameState, g2: IGameState): string {
   return `${retVal}${isCheck ? (isCheckmate ? "#" : "+") : ""}`;
 }
 
-function getPromotionLetters(g: IGameState, initialSquare: ISquareCoreProps, targetSquare: ISquareCoreProps) {
+function getPromotionLetters(
+  g: IGameState,
+  initialSquare: ISquareCoreProps,
+  targetSquare: ISquareCoreProps
+) {
   const targetColumn = targetSquare.rowNumber;
   const pieceThatMoved = initialSquare.occupiedPiece?.piece.name;
 
@@ -277,11 +356,15 @@ function getSpecialRowNumberOrColumnName(
   g: IGameState,
   initialSquare: ISquareCoreProps,
   targetSquare: ISquareCoreProps
-): number | typeof colLettersArray[number] | ""  {
+): number | typeof colLettersArray[number] | "" {
   const initialBoardSpot = getBoardSpotFromPiece(initialSquare);
   const targetBoardSpot = getBoardSpotFromPiece(targetSquare);
   const pieceThatMoved = initialSquare.occupiedPiece?.piece.name;
-  if (pieceThatMoved && pieceThatMoved !== ChessPiece.Pawn && g.allPossibleMoves) {
+  if (
+    pieceThatMoved &&
+    pieceThatMoved !== ChessPiece.Pawn &&
+    g.allPossibleMoves
+  ) {
     // Find all other pieces that could have moved to the target board spot
     const squaresThatCouldAlsoMoveToTarget = getAllKeysThatContainValue(
       targetBoardSpot,
